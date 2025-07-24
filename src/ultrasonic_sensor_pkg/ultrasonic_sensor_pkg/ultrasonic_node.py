@@ -37,7 +37,7 @@ class UltrasonicNode(Node):
         self.ultrasonic_thread.start()
 
         # --------------- 发布超声波话题 ---------------
-        self.publisher_ = self.create_publisher(Float32MultiArray, 'ultrasonic_topic', 10)
+        self.publisher_ = self.create_publisher(Float32MultiArray, '/ultrasonic_topic', 10)
         
         # ------------- 定时发布超声波数据 ----------
         self.timer = self.create_timer(self.pub_rate, self.ultrasonic_pub_callback)
