@@ -1,0 +1,19 @@
+ultrasonic_node:
+  ros__parameters:
+    # -------------- frame id ----------------
+    sensor_front_frame:  "ultrasonic_front"   # 前端传感器
+    sensor_left_frame:   "ultrasonic_left"    # 左侧传感器
+    sensor_right_frame:  "ultrasonic_right"   # 右侧传感器
+    sensor_behind_frame: "ultrasonic_behind"  # 后端传感器
+    
+    # --------------- usb 端口 -----------------
+    usb_port: "/dev/ttyUSB0"  # USB端口
+
+    # ---------------- 滤波 -------------------
+    is_fliter: True           # 是否开启滤波
+
+    # -------------- 参数 均需为浮点数 ---------------
+    min_range:      0.014  # 最小扫描距离 超过则为 -1
+    max_range:      1.6    # 最大扫描距离 超过则为 -1
+    field_of_view:  1.57   # 90度
+    update_rate:    10.0   # 最大为 50HZ
