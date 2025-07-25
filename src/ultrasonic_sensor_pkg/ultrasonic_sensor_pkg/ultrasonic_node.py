@@ -33,7 +33,7 @@ class UltrasonicNode(Node):
                                      min_range=self.min_range, 
                                      is_fliter=self.is_fliter)  # 连接超声波传感器
         self.ultrasonic_queue = queue.Queue(maxsize=10)  # 创建读取超声波传感器队列
-        self.ultrasonic_thread = threading.Thread(target=self.ultrasonic.run, args=(self.ultrasonic_queue, ))  # 创建读取超声波传感器线程
+        self.ultrasonic_thread = threading.Thread(target=self.ultrasonic.run, args=(self.ultrasonic_queue, ), daemon=True)  # 创建读取超声波传感器线程
         self.ultrasonic_thread.start()
 
         # --------------- 发布超声波话题 ---------------
@@ -51,7 +51,10 @@ class UltrasonicNode(Node):
         msg = Float32MultiArray()
         msg.data = data
         self.publisher_.publish(msg)
-        self.get_logger().info(f"Publishing: {data}")
+        # self.get_logger().info(f"Publishing: {data}")
+
+    def __del__(self):
+        self.destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)
@@ -62,8 +65,6 @@ def main(args=None):
     except KeyboardInterrupt:
         ultrasonic_node.get_logger().warn('Keyboard interrupt, shutting down...')
     finally:
-        ultrasonic_node.ultrasonic_thread.stop()
-        ultrasonic_node.destroy_node()
         rclpy.try_shutdown()
 
 

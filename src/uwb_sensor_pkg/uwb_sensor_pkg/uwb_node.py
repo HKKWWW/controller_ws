@@ -13,7 +13,7 @@ class UWBNode(Node):
         super().__init__('uwb_node')
 
         # ------------- 加载 .yaml 文件 -------------
-        self.usb_port = self.declare_parameter("usb_port", "/dev/ttyUSB0").value  # 指定端口
+        self.usb_port = self.declare_parameter("usb_port", "/dev/ttyUSB0").value    # 指定端口
 
         self.uwb_T0_frame = self.declare_parameter('uwb_T0_frame', 'uwb_T0').value  # frame_id
         self.uwb_A0_frame = self.declare_parameter('uwb_A0_frame', 'uwb_A0').value
@@ -51,11 +51,11 @@ class UWBNode(Node):
         self.get_logger().info(f"pub_rate: {self.pub_rate}")
 
         # ------------ 初始化 UWB ------------
-        self.uwb = UWB(usb_port=self.usb_port, 
+        self.uwb = UWB(usb_port=self.usb_port,                                            # 连接 UWB
                                 max_distance=self.max_distance, 
-                                min_distance=self.min_distance)  # 连接超声波传感器
-        self.uwb_queue = queue.Queue(maxsize=10)  # 创建读取超声波传感器队列
-        self.uwb_thread = threading.Thread(target=self.uwb.run, args=(self.uwb_queue, ))  # 创建读取超声波传感器线程
+                                min_distance=self.min_distance)                           
+        self.uwb_queue = queue.Queue(maxsize=10)                                          # 创建读取 UWB 队列
+        self.uwb_thread = threading.Thread(target=self.uwb.run, args=(self.uwb_queue, ), daemon=True)  # 创建读取 UWB 线程
         self.uwb_thread.start()
         
         # ------------- 定时发布 UWB 数据 ----------
@@ -84,8 +84,10 @@ class UWBNode(Node):
         uwb_msg.header.frame_id = self.uwb_T0_frame
         uwb_msg.header.stamp = self.get_clock().now().to_msg()
 
-        
         self.publisher_.publish(UWBMsg())
+
+    def __del__(self):
+        self.destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)
@@ -96,8 +98,6 @@ def main(args=None):
     except KeyboardInterrupt:
         uwb_node.get_logger().warn('Keyboard interrupt, shutting down...')
     finally:
-        uwb_node.uwb_thread.stop()
-        uwb_node.destroy_node()
         rclpy.try_shutdown()
 
 
