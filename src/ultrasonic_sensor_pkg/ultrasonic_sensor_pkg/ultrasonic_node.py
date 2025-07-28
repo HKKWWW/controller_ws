@@ -9,7 +9,7 @@ from ultrasonic_sensor_pkg.ultrasonic import Ultrasonic
 
 
 class UltrasonicNode(Node):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('ultrasonic_node')
 
         # ------------- 加载 .yaml 文件 -------------
@@ -42,7 +42,7 @@ class UltrasonicNode(Node):
         # ------------- 定时发布超声波数据 ----------
         self.timer = self.create_timer(self.pub_rate, self.ultrasonic_pub_callback)
 
-    def ultrasonic_pub_callback(self):
+    def ultrasonic_pub_callback(self) -> None:
         try:
             data = self.ultrasonic_queue.get_nowait()
         except queue.Empty:
@@ -53,7 +53,7 @@ class UltrasonicNode(Node):
         self.publisher_.publish(msg)
         # self.get_logger().info(f"Publishing: {data}")
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.destroy_node()
 
 def main(args=None):

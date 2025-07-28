@@ -6,7 +6,7 @@ from loguru import logger
 from collections import deque
 
 class Ultrasonic:
-    def __init__(self, usb_port='/dev/ttyUSB0', max_range=1.6, min_range=0.014, is_fliter=False):
+    def __init__(self, usb_port='/dev/ttyUSB0', max_range=1.6, min_range=0.014, is_fliter=False) -> None:
         # -------------- 连接超声波传感器 ----------------
         logger.info("正在连接超声传感器 ...")
         for _ in range(5):
@@ -30,18 +30,19 @@ class Ultrasonic:
                 time.sleep(0.5)
         raise serial.SerialException("无法连接超声波传感器")
 
-    def run(self, read_ultrasonic_queue:queue.Queue):
+    def run(self, read_ultrasonic_queue:queue.Queue) -> None:
 
         while True:
             try:
                 ultrasonic_distances = self.get_ultrasonic_distances()  # 获取数据
                 read_ultrasonic_queue.put_nowait(ultrasonic_distances)  # 将超声波传感器数据压入队列
             except Exception as e:
-                print(e)
+                read_ultrasonic_queue.get_nowait()
+                read_ultrasonic_queue.put_nowait(ultrasonic_distances)
 
             time.sleep(0.02)
 
-    def get_ultrasonic_distances_fliter(self):  # 修该此读取数据
+    def get_ultrasonic_distances_fliter(self) -> list[float]:  # 修该此读取数据
         data = self.read_frame()
         d0 = data
         d1 = -1
@@ -66,7 +67,7 @@ class Ultrasonic:
 
         return ultrasonic_distances
     
-    def get_ultrasonic_distances(self):  # 修该此读取数据
+    def get_ultrasonic_distances(self) -> list[float]:  # 修该此读取数据
         data = self.read_frame()
         d0 = data
         d1 = -1

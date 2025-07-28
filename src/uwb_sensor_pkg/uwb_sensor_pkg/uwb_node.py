@@ -1,15 +1,18 @@
-import threading
+import math
 import queue
+import threading
 
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
+from tf_transformations import quaternion_from_euler
 
 from synapath_interfaces.msg import UWBMsg
 from uwb_sensor_pkg.uwb import UWB
 
+
 class UWBNode(Node):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('uwb_node')
 
         # ------------- 加载 .yaml 文件 -------------
@@ -59,16 +62,21 @@ class UWBNode(Node):
         self.uwb_thread.start()
         
         # ------------- 定时发布 UWB 数据 ----------
-        self.publisher_ = self.create_publisher(UWBMsg, '/uwb_coord', 10)
-        self.publisher_ = self.create_publisher(UWBMsg, '/uwb_imu', 10)
+        self.publisher_coord = self.create_publisher(UWBMsg, '/uwb_coord', 10)
+        self.publisher_imu = self.create_publisher(Imu, '/uwb_imu', 10)
         
         # ------------- 定时发布 UWB 数据 ----------
         self.timer = self.create_timer(self.pub_rate, self.uwb_pub_callback)
         
-    def uwb_pub_callback(self):
-        self.get_logger().info("Hello UWB")
+    def uwb_pub_callback(self) -> None:
+        try:
+            data = self.uwb_queue.get_nowait()
+        except queue.Empty:
+            return 
+        
+        stamp = self.get_clock().now().to_msg()
 
-        uwb_msg = UWBMsg()
+        # ---- 发布 UWB 坐标话题 ----
         '''
         std_msgs/Header header
 
@@ -77,16 +85,58 @@ class UWBNode(Node):
         float32 t0_z
 
         float32 a0_distance
-        float32 a1_distancetry_shutdown
+        float32 a1_distance
         float32 a2_distance
         float32 a3_distance
-        '''
+        ''' 
+        uwb_msg = UWBMsg()
+        uwb_msg.header.stamp = stamp
         uwb_msg.header.frame_id = self.uwb_T0_frame
-        uwb_msg.header.stamp = self.get_clock().now().to_msg()
 
-        self.publisher_.publish(UWBMsg())
+        uwb_msg.t0_x = 0.0
+        uwb_msg.t0_y = 0.0
+        uwb_msg.t0_z = 0.0
 
-    def __del__(self):
+        # 各基站到标签的距离
+        d = data["distances"]
+        uwb_msg.a0_distance = float(d[0]) if d[0] is not None else -1.0
+        uwb_msg.a1_distance = float(d[1]) if d[1] is not None else -1.0
+        uwb_msg.a2_distance = float(d[2]) if d[2] is not None else -1.0
+        uwb_msg.a3_distance = float(d[3]) if d[3] is not None else -1.0
+
+        self.publisher_coord.publish(uwb_msg)
+
+        # ---- 发布 IMU 数据话题 ----
+        imu_msg = Imu()
+        imu_msg.header = uwb_msg.header
+
+        # 单位 m/s²
+        imu_msg.linear_acceleration.x = float(data["acc"][0])
+        imu_msg.linear_acceleration.y = float(data["acc"][1])
+        imu_msg.linear_acceleration.z = float(data["acc"][2])
+
+        # 单位转成弧度每秒 rad/s
+        imu_msg.angular_velocity.x = float(data["gyro"][0]) * 3.1415926 / 180.0  # deg->rad
+        imu_msg.angular_velocity.y = float(data["gyro"][1]) * 3.1415926 / 180.0
+        imu_msg.angular_velocity.z = float(data["gyro"][2]) * 3.1415926 / 180.0
+
+        # 方向四元数 
+        pitch_deg, roll_deg, yaw_deg = data["angle"]
+        roll = math.radians(roll_deg)
+        pitch = math.radians(pitch_deg)
+        yaw = math.radians(yaw_deg)
+
+        qx, qy, qz, qw = quaternion_from_euler(roll, pitch, yaw)
+        imu_msg.orientation.x = qx
+        imu_msg.orientation.y = qy
+        imu_msg.orientation.z = qz
+        imu_msg.orientation.w = qw     
+
+        self.publisher_imu.publish(imu_msg) # 发布imu的数据
+
+        # self.get_logger().info("Published UWB + IMU data")
+
+    def __del__(self) -> None:
         self.destroy_node()
 
 def main(args=None):

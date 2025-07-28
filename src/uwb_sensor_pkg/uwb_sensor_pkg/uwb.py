@@ -6,7 +6,7 @@ from loguru import logger
 from collections import deque
 
 class UWB():
-    def __init__(self, usb_port='/dev/ttyUSB0', max_distance=149.0, min_distance=0.0):
+    def __init__(self, usb_port='/dev/ttyUSB0', max_distance=149.0, min_distance=0.0) -> None:
         # -------------- 连接超声波传感器 ----------------
         logger.info("正在连接 UWB ...")
         for _ in range(5):
@@ -24,55 +24,62 @@ class UWB():
                 time.sleep(0.5)
         raise serial.SerialException("无法连接 UWB")
 
-    def run(self, read_uwb_queue:queue.Queue):
-
+    def run(self, read_uwb_queue: queue.Queue) -> None:
         while True:
             try:
-                uwb_data = self.get_uwb_function()  # 获取数据
-                
-                # ...
-                read_uwb_queue.put_nowait(uwb_data)  # 将超声波传感器数据压入队列
-
+                uwb_data = self.get_uwb_function()
+                if uwb_data:
+                    read_uwb_queue.put_nowait(uwb_data)
             except Exception as e:
-                print(e)
-
+                read_uwb_queue.get_nowait()
+                read_uwb_queue.put_nowait(uwb_data)
             time.sleep(0.02)
 
-    def get_uwb_distances(self):  # 修该此读取数据
-        data = self.read_frame()
-        d0 = data
-        d1 = -1
-        d2 = -1
-        d3 = -1
-        # print("read frames:", d0, d1, d2, d3)  # 调试输出
+    def read_frame(self) -> str | None:
+        try:
+            line = self.ser.readline().decode('utf-8').strip()
+            if line.startswith("mi,"):
+                return line
+        except Exception as e:
+            logger.error(f"读取串口失败: {e}")
+        return None
 
-        uwb_distances = [float(d0), float(d1), float(d2), float(d3)]
+    def get_uwb_distances(self) -> dict | None:
+        line = self.read_frame()
+        if line is None:
+            return None
 
-        for index in range(4):
-                uwb_distances[index] = float(uwb_distances[index] / 1000) # 转换为米制
-                if uwb_distances[index] > self.max_distance or uwb_distances[index] < self.min_distance:
-                    uwb_distances[index] = -1.0
+        fields = line.split(',')
+        if len(fields) < 23:
+            logger.warning(f"字段数量不足: {len(fields)} => {line}")
+            return None
 
-        return uwb_distances
+        try:
+            time_sec = float(fields[1])
+            distances = []
+            for i in range(2, 6):  # A0~A3 一共接受 3 个基站距离
+                d = fields[i]
+                distances.append(float(d) if d != 'null' else None)
 
-    def read_frame(self) -> float | None:
-        # 按 FF + 数据位 (高位 + 低位) + FD 协议读取一帧
-        # 同步帧头 0xFF
-        for _ in range(3):
-            first = self.ser.read(1)
-            if first:
-                break
-            time.sleep(0.005)  # 等待 5 ms
+            acc = list(map(float, fields[10:13]))
+            gyro = list(map(float, fields[13:16]))
+            mag = list(map(float, fields[16:19]))
+            pitch, roll, yaw = map(float, fields[19:22])
+            tag_id = fields[22]
 
-        if first[0] == 0xFF:
-            time.sleep(0.01)  # 等待 10 ms，以避免数据丢失
-            data = self.ser.read(3)
-            if len(data) != 3 or data[2] != 0xFD:
-                return float('nan')
-            # print(data)
-            return (data[0] << 8) | data[1]
-        
-        return float('nan')
+            return {
+                "timestamp": time_sec,
+                "distances": distances,
+                "acc": acc,
+                "gyro": gyro,
+                "mag": mag,
+                "angle": [pitch, roll, yaw],
+                "tag_id": tag_id
+            }
+
+        except ValueError as e:
+            logger.error(f"解析失败: {e}, line: {line}")
+            return None
 
 
 if __name__ == '__main__':
@@ -87,11 +94,9 @@ if __name__ == '__main__':
         try:
             uwb_data = uwb_queue.get_nowait()
 
-            print(uwb_data)
+            logger.info(uwb_data)
 
-            time.sleep(0.1)
+            time.sleep(1)
         except queue.Empty:
             pass
-        
-    uwb_thread.stop()
     
