@@ -24,8 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'uwb_node = uwb_sensor_pkg.uwb_node:main',
-            'euler_listener_node = uwb_sensor_pkg.euler_listener:main'
+            'uwb_node = uwb_sensor_pkg.uwb_node:main'
         ],
     },
 )

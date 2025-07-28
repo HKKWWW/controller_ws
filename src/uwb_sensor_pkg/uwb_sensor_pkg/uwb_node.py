@@ -1,6 +1,7 @@
 import math
 import queue
 import threading
+import numpy as np
 
 import rclpy
 from rclpy.node import Node
@@ -39,6 +40,7 @@ class UWBNode(Node):
         self.uwb_A3_coord = [self.declare_parameter('uwb_A3_x', 0.0).value,  # A3 坐标
                            self.declare_parameter('uwb_A3_y', 0.0).value,
                            self.declare_parameter('uwb_A3_z', 0.0).value]
+        
         self.get_logger().info(
             f"\nT0: {self.uwb_T0_coord}\n"
             f"A0: {self.uwb_A0_coord}\n"
@@ -46,6 +48,12 @@ class UWBNode(Node):
             f"A2: {self.uwb_A2_coord}\n"
             f"A3: {self.uwb_A3_coord}"
         )
+
+        self.is_solve = self.declare_parameter('is_solve', False).value
+        if self.is_solve:
+            self.anchors_coord = [self.uwb_A0_coord, self.uwb_A1_coord, self.uwb_A2_coord, self.uwb_A3_coord]
+        else:
+            self.anchors_coord = None
 
         self.min_distance = self.declare_parameter('min_distance', 0.0).value
         self.max_distance = self.declare_parameter('max_distance', 149.0).value
@@ -56,7 +64,8 @@ class UWBNode(Node):
         # ------------ 初始化 UWB ------------
         self.uwb = UWB(usb_port=self.usb_port,                                            # 连接 UWB
                                 max_distance=self.max_distance, 
-                                min_distance=self.min_distance)                           
+                                min_distance=self.min_distance,
+                                anchors_coord=self.anchors_coord)                           
         self.uwb_queue = queue.Queue(maxsize=10)                                          # 创建读取 UWB 队列
         self.uwb_thread = threading.Thread(target=self.uwb.run, args=(self.uwb_queue, ), daemon=True)  # 创建读取 UWB 线程
         self.uwb_thread.start()
@@ -93,9 +102,9 @@ class UWBNode(Node):
         uwb_msg.header.stamp = stamp
         uwb_msg.header.frame_id = self.uwb_T0_frame
 
-        uwb_msg.t0_x = 0.0
-        uwb_msg.t0_y = 0.0
-        uwb_msg.t0_z = 0.0
+        uwb_msg.t0_x = float(data["x_y_z"][0])
+        uwb_msg.t0_y = float(data["x_y_z"][1])
+        uwb_msg.t0_z = float(data["x_y_z"][2])
 
         # 各基站到标签的距离
         d = data["distances"]
